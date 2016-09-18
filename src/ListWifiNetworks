@@ -1,0 +1,11 @@
+#!/bin/bash
+
+echo "Available networks:"
+echo 
+
+gobonet_backend full-scan wlan0 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
+
+echo
+echo "Type"
+echo "   ConnectWifi \"<network>\""
+echo "to connect."

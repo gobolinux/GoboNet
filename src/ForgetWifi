@@ -1,0 +1,15 @@
+#!/bin/bash
+
+wifi_dir="$HOME/.cache/GoboNet/wifi"
+interface="wlan0"
+
+essid="$1"
+sanit=$(echo "$essid" | tr -Cd '[:alnum:]')
+file="$sanit-"$(echo "$essid" | md5sum | cut -d' ' -f1)
+
+if AskQuestion --question --title="Forget $essid" --text="Are you sure you want to forget network '$essid'?"
+then
+   disconnect_wifi "$essid"
+   rm -f "$wifi_dir/$file"
+fi
+

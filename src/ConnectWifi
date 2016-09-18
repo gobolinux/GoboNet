@@ -1,0 +1,26 @@
+#!/bin/bash
+
+wifi_dir="$HOME/.cache/GoboNet/wifi"
+interface="wlan0"
+
+essid="$1"
+sanit=$(echo "$essid" | tr -Cd '[:alnum:]')
+file="$sanit-"$(echo "$essid" | md5sum | cut -d' ' -f1)
+
+if ! [ -e "$wifi_dir/$file" ]
+then
+   mkdir -p "$wifi_dir" || exit 1
+   chmod 0700 "$wifi_dir" || exit 1
+   pass=$(AskQuestion --password --title="Connect to $essid")
+   if [ $? = 1 ]
+   then
+      exit 1
+   fi
+   echo "$pass" | wpa_passphrase "$essid" | grep -v " *#" > "$wifi_dir/$file"
+   if [ $? = 1 ]
+   then
+      exit 1
+   fi
+fi
+
+gobonet_backend connect "$wifi_dir/$file" "$interface"

@@ -1,0 +1,5 @@
+#!/bin/bash
+
+interface="wlan0"
+
+gobonet_backend disconnect "$interface"
