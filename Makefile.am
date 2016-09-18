@@ -2,7 +2,7 @@
 AUTOMAKE_OPTIONS = subdir-objects
 
 sbin_PROGRAMS = gobonet_backend
-bin_SCRIPTS = src/AskQuestion src/ConnectWifi src/DisconnectWifi src/ForgetWifi src/ListWifiNetworks
+bin_SCRIPTS = src/gobonet
 
 gobonet_backend_SOURCES = src/gobonet_backend.c
 

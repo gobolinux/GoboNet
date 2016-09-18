@@ -1,0 +1,244 @@
+#!/bin/bash
+
+wifi_dir="$HOME/.cache/GoboNet/wifi"
+
+function detect_wifi_interface() {
+   for iface in /sys/class/net/*
+   do
+       if grep -q "DEVTYPE=wlan" "$iface/uevent" || [ -e "$iface/phy80211" ]
+       then
+          basename "$iface"
+          return
+       fi
+   done
+}
+
+function ask_question() {
+   local question_type=password
+   local dialog_title=
+   local dialog_text=
+   local backend=any
+   
+   for arg in "$@"
+   do
+      case "$arg" in
+         --password)
+            question_type=password
+            ;;
+         --question)
+            question_type=yesno
+            ;;
+         --title=*)
+            dialog_title=${arg#--title=}
+            ;;
+         --text=*)
+            dialog_text=${arg#--text=}
+            ;;
+         --backend=*)
+            backend=${arg#--backend=}
+            ;;
+      esac
+   done
+   
+   if [ "$backend" = "pinentry" ] || { [ "$backend" = "any" ] && which pinentry &> /dev/null ;}
+   then
+      case "$question_type" in
+         password)
+            echo -e "SETTITLE $dialog_title\nSETDESC Please enter password\nSETPROMPT Password:\nGETPIN\n" | pinentry | grep "^D " | cut -b3-
+            ;;
+         yesno)
+            if echo -e "SETTITLE $dialog_title\nSETDESC $dialog_text\nSETOK Yes\nSETCANCEL No\nCONFIRM\n" | pinentry | grep -q "^ERR "
+            then
+               exit 1
+            else
+               exit 0
+            fi
+            ;;
+      esac
+   elif [ "$backend" = "zenity" ] || { [ "$backend" = "any" ] && [ "$DISPLAY" ] && which zenity &> /dev/null ;}
+   then
+      case "$question_type" in
+         password)
+            zenity --no-markup --password --title="$dialog_title" 
+            ;;
+         yesno)
+            zenity --no-markup --question --title="$dialog_title" --text="$dialog_text"
+            ;;
+      esac
+   else
+      # CLI pure Bash backend
+      case "$question_type" in
+         password)
+            echo "$dialog_title" > /dev/tty
+            echo "----------------------------------------" > /dev/tty
+            echo -n "Password: " > /dev/tty
+            read -s password
+            echo "$password"
+            ;;
+         yesno)
+            echo "$dialog_title" > /dev/tty
+            echo "----------------------------------------" > /dev/tty
+            while true
+            do
+               echo "$dialog_text (y/n)" > /dev/tty
+               read 
+               if [ "${REPLY:0:1}" = "y" -o "${REPLY:0:1}" = "Y" ]
+               then
+                  exit 0
+               elif [ "${REPLY:0:1}" = "n" -o "${REPLY:0:1}" = "N" ]
+               then
+                  exit 1
+               fi
+            done
+            ;;
+      esac
+   fi
+}
+
+function network_config_file() {
+   local essid="$1"
+   local sanit=$(echo "$essid" | tr -Cd '[:alnum:]')
+   echo "$sanit-"$(echo "$essid" | md5sum | cut -d' ' -f1)
+}
+
+function connect_wifi() {   
+   local essid="$1"
+   local file="$(network_config_file "$essid")"
+   
+   if ! [ -e "$wifi_dir/$file" ]
+   then
+      mkdir -p "$wifi_dir" || exit 1
+      chmod 0700 "$wifi_dir" || exit 1
+      pass=$(ask_question --password --title="Connect to $essid")
+      if [ $? = 1 ]
+      then
+         exit 1
+      fi
+      echo "$pass" | wpa_passphrase "$essid" | grep -v " *#" > "$wifi_dir/$file"
+      if [ $? = 1 ]
+      then
+         exit 1
+      fi
+   fi
+   
+   gobonet_backend connect "$wifi_dir/$file" "$interface"
+}
+
+function disconnect_wifi() {
+   gobonet_backend disconnect "$interface"
+}
+
+function forget_wifi() {
+   local essid="$1"
+   local file="$(network_config_file "$essid")"
+   
+   if ask_question --question --title="Forget $essid" --text="Are you sure you want to forget network '$essid'?"
+   then
+      disconnect_wifi "$essid"
+      rm -f "$wifi_dir/$file"
+   fi   
+}
+
+function list_wifi_networks() {
+   echo "Available networks:"
+   echo 
+   
+   gobonet_backend full-scan wlan0 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
+   
+   echo
+   echo "Type"
+   echo "   gobonet connect \"<network>\""
+   echo "to connect."
+}
+
+function autoconnect_wifi() {
+   local nets_file="$(mktemp)"   
+   gobonet_backend full-scan wlan0 2> /dev/null \
+    | grep ESSID \
+    | sed "s,.*ESSID:\"\(.*\)\"$,\1,g" \
+    | while read essid
+   do
+      echo -e "$(network_config_file "$essid")\t$essid" >> "$nets_file"
+   done
+   
+   ls "$wifi_dir" --sort=time | while read config
+   do
+      pair="$(grep "$config"$'\t' "$nets_file")"
+      if [ "$pair" ]
+      then
+         essid=$(echo "$pair" | cut -f2)
+         connect_wifi "$essid"
+         if [ $? = 0 ]
+         then
+            return
+         fi
+      fi
+   done
+   return 1
+}
+
+function show_help() {
+   echo "GoboNet - an ultra-minimalistic network manager"
+   echo ""
+   echo "Usage:"
+   echo "   gobonet autoconnect"
+   echo "              Scan Wifi networks and connect to a known one"
+   echo "   gobonet connect \"<essid>\""
+   echo "              Connect to a given Wifi network"
+   echo "   gobonet disconnect"
+   echo "              Disconnect Wifi"
+   echo "   gobonet forget \"<essid>\""
+   echo "              Disconnect Wifi and forget config for this network"
+   echo "   gobonet list"
+   echo "              List available Wifi networks"
+   echo ""
+   exit 0
+}
+
+function usage() {
+   echo "gobonet: Usage: $0 $*"
+   exit 1
+}
+
+########## main ##########
+
+interface="$(detect_wifi_interface)"
+if [ "$interface" = "" ]
+then
+   echo "gobonet: Failed to detect a wifi network interface, aborting."
+   exit 1
+fi
+
+[ "$1" ] || show_help
+
+case "$1" in
+   autoconnect)
+      [ "$2" = "" ] || usage "autoconnect"
+      autoconnect_wifi
+      ;;
+   connect)
+      essid="$2"
+      [ "$essid" -a "$3" = "" ] || usage "connect \"<essid>\""
+      connect_wifi "$essid" && echo "gobonet: Connected to \"$essid\"!"
+      ;;
+   disconnect)
+      [ "$2" = "" ] || usage "disconnect"
+      disconnect_wifi
+      ;;
+   forget)
+      essid="$2"
+      [ "$essid" -a "$3" = "" ] || usage "forget \"<essid>\""
+      forget_wifi "$essid"
+      ;;
+   list)
+      [ "$2" = "" ] || usage "list"
+      list_wifi_networks
+      ;;
+   help)
+      show_help
+      ;;
+   *)
+      show_help
+      ;;
+esac
+
