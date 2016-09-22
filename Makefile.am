@@ -3,6 +3,7 @@ AUTOMAKE_OPTIONS = subdir-objects
 
 sbin_PROGRAMS = gobonet_backend
 bin_SCRIPTS = src/gobonet
+EXTRA_DIST = $(bin_SCRIPTS)
 
 gobonet_backend_SOURCES = src/gobonet_backend.c
 
