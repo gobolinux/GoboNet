@@ -143,7 +143,7 @@ function list_wifi_networks() {
    echo "Available networks:"
    echo 
    
-   gobonet_backend full-scan wlan0 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
+   gobonet_backend full-scan "$interface" 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
    
    echo
    echo "Type"
@@ -153,7 +153,7 @@ function list_wifi_networks() {
 
 function autoconnect_wifi() {
    local nets_file="$(mktemp)"   
-   gobonet_backend full-scan wlan0 2> /dev/null \
+   gobonet_backend full-scan "$interface" 2> /dev/null \
     | grep ESSID \
     | sed "s,.*ESSID:\"\(.*\)\"$,\1,g" \
     | while read essid
