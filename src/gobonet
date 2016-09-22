@@ -107,17 +107,35 @@ function connect_wifi() {
    
    if ! [ -e "$wifi_dir/$file" ]
    then
-      mkdir -p "$wifi_dir" || exit 1
-      chmod 0700 "$wifi_dir" || exit 1
-      pass=$(ask_question --password --title="Connect to $essid")
-      if [ $? = 1 ]
+
+      info=$(gobonet_backend quick-scan "$interface" | grep -B 1 -F "ESSID:\"$essid\"")
+      if [ $? != 0 ]
       then
-         exit 1
+         info=$(gobonet_backend full-scan "$interface" | grep -B 1 -F "ESSID:\"$essid\"")
       fi
-      echo "$pass" | wpa_passphrase "$essid" | grep -v " *#" > "$wifi_dir/$file"
-      if [ $? = 1 ]
+      info=$(echo "$info" | head -n 2)
+      if echo "$info" | grep "Encryption key:off"
       then
-         exit 1
+         {
+            echo "network={"
+            echo "   ssid=\"$essid\""
+            echo "   key_mgmt=NONE"
+            echo "}"
+         } > "$wifi_dir/$file"
+      else
+         mkdir -p "$wifi_dir" || exit 1
+         chmod 0700 "$wifi_dir" || exit 1
+         pass=$(ask_question --password --title="Connect to $essid")
+         if [ $? = 1 ]
+         then
+            exit 1
+         fi
+         echo "$pass" | wpa_passphrase "$essid" | grep -v " *#" > "$wifi_dir/$file"
+         if [ $? = 1 ]
+         then
+            rm "$wifi_dir/$file"
+            exit 1
+         fi
       fi
    fi
    
