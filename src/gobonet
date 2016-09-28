@@ -13,7 +13,7 @@ function detect_wifi_interface() {
    done
 }
 
-function ask_question() {
+function show_dialog() {
    local question_type=password
    local dialog_title=
    local dialog_text=
@@ -24,6 +24,9 @@ function ask_question() {
       case "$arg" in
          --password)
             question_type=password
+            ;;
+         --msgbox)
+            question_type=msgbox
             ;;
          --question)
             question_type=yesno
@@ -46,12 +49,16 @@ function ask_question() {
          password)
             echo -e "SETTITLE $dialog_title\nSETDESC Please enter password\nSETPROMPT Password:\nGETPIN\n" | pinentry | grep "^D " | cut -b3-
             ;;
+         msgbox)
+            echo -e "SETTITLE $dialog_title\nSETDESC $dialog_text\nMESSAGE\n" | pinentry &> /dev/null
+            return 0
+            ;;
          yesno)
             if echo -e "SETTITLE $dialog_title\nSETDESC $dialog_text\nSETOK Yes\nSETCANCEL No\nCONFIRM\n" | pinentry | grep -q "^ERR "
             then
-               exit 1
+               return 1
             else
-               exit 0
+               return 0
             fi
             ;;
       esac
@@ -61,33 +68,46 @@ function ask_question() {
          password)
             zenity --no-markup --password --title="$dialog_title" 
             ;;
+         msgbox)
+            zenity --no-markup --info --title="$dialog_title" --text="$dialog_text"
+            return 0
+            ;;
          yesno)
             zenity --no-markup --question --title="$dialog_title" --text="$dialog_text"
             ;;
       esac
    else
       # CLI pure Bash backend
+      if [ "$dialog_title" != "" ]
+      then
+         echo "----------------------------------------" > /dev/tty
+         echo "$dialog_title" > /dev/tty
+         echo "----------------------------------------" > /dev/tty
+         echo "" > /dev/tty
+      fi
       case "$question_type" in
          password)
-            echo "$dialog_title" > /dev/tty
-            echo "----------------------------------------" > /dev/tty
             echo -n "Password: " > /dev/tty
             read -s password
             echo "$password"
             ;;
+         msgbox)
+            echo "$dialog_text" > /dev/tty
+            echo "(Press Enter)" > /dev/tty
+            read
+            return 0
+            ;;
          yesno)
-            echo "$dialog_title" > /dev/tty
-            echo "----------------------------------------" > /dev/tty
             while true
             do
                echo "$dialog_text (y/n)" > /dev/tty
                read 
                if [ "${REPLY:0:1}" = "y" -o "${REPLY:0:1}" = "Y" ]
                then
-                  exit 0
+                  return 0
                elif [ "${REPLY:0:1}" = "n" -o "${REPLY:0:1}" = "N" ]
                then
-                  exit 1
+                  return 1
                fi
             done
             ;;
@@ -123,18 +143,19 @@ function connect_wifi() {
             echo "}"
          } > "$wifi_dir/$file"
       else
-         mkdir -p "$wifi_dir" || exit 1
-         chmod 0700 "$wifi_dir" || exit 1
-         pass=$(ask_question --password --title="Connect to $essid")
+         mkdir -p "$wifi_dir" || return 1
+         chmod 0700 "$wifi_dir" || return 1
+         pass=$(show_dialog --password --title="Connect to $essid")
          if [ $? = 1 ]
          then
-            exit 1
+            return 1
          fi
-         echo "$pass" | wpa_passphrase "$essid" | grep -v " *#" > "$wifi_dir/$file"
+         echo "$pass" | wpa_passphrase "$essid" > "$wifi_dir/$file"
          if [ $? = 1 ]
          then
+            show_dialog --msgbox --title="Error" --text="$(grep -v " *#" "$wifi_dir/$file")"
             rm "$wifi_dir/$file"
-            exit 1
+            return 1
          fi
       fi
    fi
@@ -150,7 +171,7 @@ function forget_wifi() {
    local essid="$1"
    local file="$(network_config_file "$essid")"
    
-   if ask_question --question --title="Forget $essid" --text="Are you sure you want to forget network '$essid'?"
+   if show_dialog --question --title="Forget $essid" --text="Are you sure you want to forget network '$essid'?"
    then
       disconnect_wifi "$essid"
       rm -f "$wifi_dir/$file"
