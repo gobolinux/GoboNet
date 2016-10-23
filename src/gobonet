@@ -43,7 +43,7 @@ function show_dialog() {
       esac
    done
    
-   if [ "$backend" = "pinentry" ] || { [ "$backend" = "any" ] && which pinentry &> /dev/null ;}
+   if [ "$backend" = "pinentry" ] || { [ "$backend" = "any" ] && [ "$DISPLAY" ] && which pinentry &> /dev/null ;}
    then
       case "$question_type" in
          password)
