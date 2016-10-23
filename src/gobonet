@@ -245,7 +245,7 @@ function show_help() {
 }
 
 function usage() {
-   echo "gobonet: Usage: $0 $*"
+   echo "gobonet: Usage: $0 $*" 1>&2
    exit 1
 }
 
@@ -254,7 +254,7 @@ function usage() {
 interface="$(detect_wifi_interface)"
 if [ "$interface" = "" ]
 then
-   echo "gobonet: Failed to detect a wifi network interface, aborting."
+   echo "gobonet: Failed to detect a wifi network interface, aborting." 1>&2
    exit 1
 fi
 
