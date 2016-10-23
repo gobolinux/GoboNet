@@ -212,7 +212,7 @@ function autoconnect_wifi() {
    
    ls "$wifi_dir" --sort=time | while read config
    do
-      pair="$(grep "$config"$'\t' "$nets_file")"
+      pair="$(grep "$config"$'\t' "$nets_file" | head -n 1)"
       if [ "$pair" ]
       then
          essid=$(echo "$pair" | cut -f2)
