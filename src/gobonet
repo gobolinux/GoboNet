@@ -160,6 +160,7 @@ function connect_wifi() {
       fi
    fi
    
+   echo $$ > "$wifi_dir/.connecting.pid"
    gobonet_backend connect "$wifi_dir/$file" "$interface"
 }
 
