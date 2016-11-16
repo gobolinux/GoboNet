@@ -9,6 +9,7 @@ Requirements
 
 * wpa_supplicant
 * dhcpcd
+* rfkill
 * net-tools (ifconfig)
 * wireless-tools (iwlist)
 * psmisc (killall)
