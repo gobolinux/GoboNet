@@ -82,6 +82,7 @@ static int const ifconfig(char const *const interface, char const *const mode) {
 
 static int const disconnect(char const *const interface) {
    if (ifconfig(interface, NULL) != 0) return 1;
+   run(GOBONET_RFKILL, "unblock", "all", NULL);
    char const *const wpa_supplicant = base_name(GOBONET_WPA_SUPPLICANT);
    char const *const dhcpcd = base_name(GOBONET_DHCPCD);
    if ((!wpa_supplicant) || (!dhcpcd)) {
@@ -101,6 +102,7 @@ static int const connect(char const *const config, char const *const interface) 
 }
 
 static int const scan() {
+   run(GOBONET_RFKILL, "unblock", "all", NULL);
    return run(GOBONET_IWLIST, "scan", NULL);
 }
 
