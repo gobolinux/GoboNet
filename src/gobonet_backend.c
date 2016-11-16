@@ -102,7 +102,6 @@ static int const connect(char const *const config, char const *const interface) 
 }
 
 static int const scan() {
-   run(GOBONET_RFKILL, "unblock", "all", NULL);
    return run(GOBONET_IWLIST, "scan", NULL);
 }
 
@@ -116,6 +115,7 @@ static int const scan_command(int const argc, char const *const *const argv, boo
 
    uid_t const uid = getuid();
    setuid(0);
+   run(GOBONET_RFKILL, "unblock", "all", NULL);
    if (ifconfig(interface, "up") != 0) return 1;
    if (is_quick_scan) {
       setuid(uid); /* drop privileges */
