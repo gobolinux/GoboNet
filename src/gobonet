@@ -262,6 +262,10 @@ fi
 [ "$1" ] || show_help
 
 case "$1" in
+   interface)
+      echo "$interface"
+      exit 0
+      ;;
    autoconnect)
       [ "$2" = "" ] || usage "autoconnect"
       autoconnect_wifi
