@@ -206,29 +206,34 @@ function autoconnect_wifi() {
       echo "gobonet: Interface $interface is already connected." 1>&2
       exit 1
    fi
+
+   # Sort available networks by signal strength.
+   # Use a temp file to avoid holding the gobonet_backend process
+   # when attempting to connect.
    local nets_file="$(mktemp)"
    gobonet_backend full-scan "$interface" 2> /dev/null \
-    | grep ESSID \
+    | gawk ' /Quality/ { quality=$1 } /ESSID/ { print quality " " $0 }' \
+    | tr '=/' '\t\t' \
+    | sort -n -k2 -r \
     | sed "s,.*ESSID:\"\(.*\)\"$,\1,g" \
-    | while read essid
-   do
-      echo -e "$(network_config_file "$essid")\t$essid" >> "$nets_file"
-   done
+    > "$nets_file"
    
-   ls "$wifi_dir" --sort=time | while read config
+   local ok=1
+   cat "$nets_file" | while read essid
    do
-      pair="$(grep "$config"$'\t' "$nets_file" | head -n 1)"
-      if [ "$pair" ]
+      config="$(network_config_file "$essid")"
+      if [ -e "$wifi_dir/$config" ]
       then
-         essid=$(echo "$pair" | cut -f2)
          connect_wifi "$essid"
          if [ $? = 0 ]
          then
-            return
+            ok=0
+            break
          fi
       fi
    done
-   return 1
+   rm "$nets_file"
+   return $ok
 }
 
 function show_help() {
