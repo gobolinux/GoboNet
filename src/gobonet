@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Avoid locale surprises when parsing commands.
+export LANG=C
+export LC_ALL=C
+
 wifi_dir="$HOME/.cache/GoboNet/wifi"
 
 function detect_wifi_interface() {

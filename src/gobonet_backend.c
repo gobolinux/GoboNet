@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <locale.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -125,6 +126,8 @@ static int const scan_command(int const argc, char const *const *const argv, boo
 }
 
 int const main(int const argc, char const *const *const argv) {
+
+   setlocale(LC_ALL, "C");
 
    if (argc < 2) {
       return 1;
