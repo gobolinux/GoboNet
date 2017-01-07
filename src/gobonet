@@ -201,7 +201,7 @@ function autoconnect_wifi() {
       echo "gobonet: Will not autoconnect over a remote login." 1>&2
       exit 1
    fi
-   if ifconfig "$interface" | grep -q "inet6\? addr:"
+   if ifconfig "$interface" | grep -q -w "UP" && ifconfig "$interface" | grep -q "inet6\? addr:"
    then
       echo "gobonet: Interface $interface is already connected." 1>&2
       exit 1
