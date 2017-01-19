@@ -219,7 +219,7 @@ function autoconnect_wifi() {
     > "$nets_file"
    
    local ok=1
-   cat "$nets_file" | while read essid
+   cat "$nets_file" | while IFS= read essid
    do
       config="$(network_config_file "$essid")"
       if [ -e "$wifi_dir/$config" ]
