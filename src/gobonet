@@ -17,6 +17,16 @@ function detect_wifi_interface() {
    done
 }
 
+function detect_wired_interface() {
+   return 1
+   # TODO
+}
+
+function is_wired_interface_plugged() {
+   return 1
+   # TODO
+}
+
 function show_dialog() {
    local question_type=password
    local dialog_title=
@@ -132,10 +142,10 @@ function connect_wifi() {
    if ! [ -e "$wifi_dir/$file" ]
    then
 
-      info=$(gobonet_backend quick-scan "$interface" | grep -B 1 -F "ESSID:\"$essid\"")
+      info=$(gobonet_backend quick-scan "$wifi_interface" | grep -B 1 -F "ESSID:\"$essid\"")
       if [ $? != 0 ]
       then
-         info=$(gobonet_backend full-scan "$interface" | grep -B 1 -F "ESSID:\"$essid\"")
+         info=$(gobonet_backend full-scan "$wifi_interface" | grep -B 1 -F "ESSID:\"$essid\"")
       fi
       info=$(echo "$info" | head -n 2)
       if echo "$info" | grep "Encryption key:off"
@@ -165,11 +175,16 @@ function connect_wifi() {
    fi
    
    echo $$ > "$wifi_dir/.connecting.pid"
-   gobonet_backend connect "$wifi_dir/$file" "$interface"
+   gobonet_backend connect "$wifi_dir/$file" "$wifi_interface"
+}
+
+function connect_wired() {
+   disconnect_wifi
+   gobonet_backend connect_dhcp "$wired_interface"
 }
 
 function disconnect_wifi() {
-   gobonet_backend disconnect "$interface"
+   gobonet_backend disconnect "$wifi_interface"
 }
 
 function forget_wifi() {
@@ -187,12 +202,21 @@ function list_wifi_networks() {
    echo "Available networks:"
    echo 
    
-   gobonet_backend full-scan "$interface" 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
+   gobonet_backend full-scan "$wifi_interface" 2> /dev/null | grep ESSID | sed "s,.*ESSID:\(.*\),\1,g"
    
    echo
    echo "Type"
    echo "   gobonet connect \"<network>\""
    echo "to connect."
+}
+
+function is_connected() {
+   [ "$1" ] || return 1
+   if [ "$1" = "$wifi_interface" ]
+   then
+      grep -q -w "$wifi_interface" /proc/net/wireless || return 1
+   fi
+   ifconfig "$1" | grep -q -w "UP" && ifconfig "$1" | grep -q "inet6\? addr:"
 }
 
 function autoconnect_wifi() {
@@ -201,17 +225,28 @@ function autoconnect_wifi() {
       echo "gobonet: Will not autoconnect over a remote login." 1>&2
       exit 1
    fi
-   if ifconfig "$interface" | grep -q -w "UP" && ifconfig "$interface" | grep -q "inet6\? addr:"
+   for iface in "$wifi_interface" "$wired_interface"
+   do
+      if is_connected "$iface"
+      then
+         echo "gobonet: Interface $iface is already connected." 1>&2
+         exit 1
+      fi
+   done
+   
+   if is_wired_interface_plugged "$wired_interface"
    then
-      echo "gobonet: Interface $interface is already connected." 1>&2
-      exit 1
+      if gobonet_backend connect_dhcp "$wired_interface"
+      then
+         exit 0
+      fi
    fi
 
    # Sort available networks by signal strength.
    # Use a temp file to avoid holding the gobonet_backend process
    # when attempting to connect.
    local nets_file="$(mktemp)"
-   gobonet_backend full-scan "$interface" 2> /dev/null \
+   gobonet_backend full-scan "$wifi_interface" 2> /dev/null \
     | gawk ' /Quality/ { quality=$1 } /ESSID/ { print quality " " $0 }' \
     | tr '=/' '\t\t' \
     | sort -n -k2 -r \
@@ -241,15 +276,21 @@ function show_help() {
    echo ""
    echo "Usage:"
    echo "   gobonet autoconnect"
-   echo "              Scan Wifi networks and connect to a known one"
+   echo "              Scan WiFi networks and connect to a known one"
    echo "   gobonet connect \"<essid>\""
-   echo "              Connect to a given Wifi network"
+   echo "              Connect to a given WiFi network"
+   echo "   gobonet connect_wired"
+   echo "              Connect to a wired network"
    echo "   gobonet disconnect"
-   echo "              Disconnect Wifi"
+   echo "              Disconnect WiFi"
    echo "   gobonet forget \"<essid>\""
-   echo "              Disconnect Wifi and forget config for this network"
+   echo "              Disconnect WiFi and forget config for this network"
    echo "   gobonet list"
-   echo "              List available Wifi networks"
+   echo "              List available WiFi networks"
+   echo "   gobonet wifi_interface"
+   echo "              Print detected WiFi interface"
+   echo "   gobonet wired_interface"
+   echo "              Print detected wired interface"
    echo ""
    exit 0
 }
@@ -261,19 +302,26 @@ function usage() {
 
 ########## main ##########
 
-interface="$(detect_wifi_interface)"
-if [ "$interface" = "" ]
+wifi_interface="$(detect_wifi_interface)"
+wired_interface="$(detect_wired_interface)"
+if [ "$wifi_interface" = "" -a "$wired_interface" = "" ]
 then
-   echo "gobonet: Failed to detect a wifi network interface, aborting." 1>&2
+   echo "gobonet: Failed to detect a network interface, aborting." 1>&2
    exit 1
 fi
 
 [ "$1" ] || show_help
 
 case "$1" in
-   interface)
-      echo "$interface"
-      exit 0
+   interface|wifi_interface)
+      echo "$wifi_interface"
+      [ "$wifi_interface" != "" ]
+      exit $?
+      ;;
+   wired_interface)
+      echo "$wired_interface"
+      [ "$wired_interface" != "" ]
+      exit $?
       ;;
    autoconnect)
       [ "$2" = "" ] || usage "autoconnect"
@@ -283,6 +331,10 @@ case "$1" in
       essid="$2"
       [ "$essid" -a "$3" = "" ] || usage "connect \"<essid>\""
       connect_wifi "$essid" && echo "gobonet: Connected to \"$essid\"!"
+      ;;
+   connect_wired)
+      [ "$2" = "" ] || usage "connect_wired"
+      connect_wired && echo "gobonet: Connected to \"$wired_interface\"!"
       ;;
    disconnect)
       [ "$2" = "" ] || usage "disconnect"
