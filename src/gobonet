@@ -301,6 +301,8 @@ function show_help() {
    echo "              Print detected WiFi interface"
    echo "   gobonet wired_interface"
    echo "              Print detected wired interface"
+   echo "   gobonet is_connected <interface>"
+   echo "              Exit status indicates if interface is connected"
    echo ""
    exit 0
 }
@@ -331,6 +333,11 @@ case "$1" in
    wired_interface)
       echo "$wired_interface"
       [ "$wired_interface" != "" ]
+      exit $?
+      ;;
+   is_connected)
+      [ "$2" = "" ] && usage "is_connected <interface>"
+      is_connected "$2"
       exit $?
       ;;
    autoconnect)
