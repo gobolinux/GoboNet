@@ -109,6 +109,11 @@ static int const connect_dhcp(char const *const interface, uid_t const dummy) {
    return 0;
 }
 
+static int const interface_up(char const *const interface, uid_t const dummy) {
+   if (ifconfig(interface, "up") != 0) return 1;
+   return 0;
+}
+
 static int const scan(char const *const interface, uid_t const run_as) {
    run(GOBONET_RFKILL, "unblock", "all", NULL);
    if (ifconfig(interface, "up") != 0) return 1;
@@ -151,7 +156,9 @@ int const main(int const argc, char const *const *const argv) {
       setuid(0);
       if (connect(config, interface) != 0) return 1;
 
-   } else if (strcmp(argv[1], "connect_dhcp") == 0) {
+   } else if (strcmp(argv[1], "interface-up") == 0) {
+      return interface_command(argc, argv, interface_up, false);
+   } else if (strcmp(argv[1], "connect-dhcp") == 0) {
       return interface_command(argc, argv, connect_dhcp, false);
    } else if (strcmp(argv[1], "disconnect") == 0) {
       return interface_command(argc, argv, disconnect, false);

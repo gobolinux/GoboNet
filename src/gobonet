@@ -18,13 +18,24 @@ function detect_wifi_interface() {
 }
 
 function detect_wired_interface() {
-   return 1
-   # TODO
+   for iface in /sys/class/net/*
+   do
+       if grep -q "DEVTYPE=wlan" "$iface/uevent" || [ -e "$iface/phy80211" ]
+       then
+          continue
+       fi
+       if [ "$(cat "$iface/type")" = "1" ] # ethernet
+       then
+          basename "$iface"
+          return
+       fi
+   done
 }
 
 function is_wired_interface_plugged() {
-   return 1
-   # TODO
+   [ "$wired_interface" ] || return 1
+   gobonet_backend interface-up "$wired_interface"
+   [ "$(cat /sys/class/net/$wired_interface/carrier)" = 1 ]
 }
 
 function show_dialog() {
@@ -219,7 +230,7 @@ function is_connected() {
    ifconfig "$1" | grep -q -w "UP" && ifconfig "$1" | grep -q "inet6\? addr:"
 }
 
-function autoconnect_wifi() {
+function autoconnect() {
    if [ "$SSH_CONNECTION" ]
    then
       echo "gobonet: Will not autoconnect over a remote login." 1>&2
@@ -233,10 +244,9 @@ function autoconnect_wifi() {
          exit 1
       fi
    done
-   
    if is_wired_interface_plugged "$wired_interface"
    then
-      if gobonet_backend connect_dhcp "$wired_interface"
+      if gobonet_backend connect-dhcp "$wired_interface"
       then
          exit 0
       fi
@@ -325,7 +335,7 @@ case "$1" in
       ;;
    autoconnect)
       [ "$2" = "" ] || usage "autoconnect"
-      autoconnect_wifi
+      autoconnect
       ;;
    connect)
       essid="$2"
