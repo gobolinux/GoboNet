@@ -191,7 +191,7 @@ function connect_wifi() {
 
 function connect_wired() {
    disconnect_wifi
-   gobonet_backend connect_dhcp "$wired_interface"
+   gobonet_backend connect-dhcp "$wired_interface"
 }
 
 function disconnect_wifi() {
