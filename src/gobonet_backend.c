@@ -81,7 +81,7 @@ static int const ifconfig(char const *const interface, char const *const mode) {
    }
 }
 
-static int const disconnect(char const *const interface) {
+static int const disconnect(char const *const interface, uid_t const dummy) {
    if (ifconfig(interface, NULL) != 0) return 1;
    run(GOBONET_RFKILL, "unblock", "all", NULL);
    char const *const wpa_supplicant = base_name(GOBONET_WPA_SUPPLICANT);
@@ -95,18 +95,34 @@ static int const disconnect(char const *const interface) {
 }
 
 static int const connect(char const *const config, char const *const interface) {
-   if (disconnect(interface) != 0) return 1;
+   if (disconnect(interface, false) != 0) return 1;
    if (ifconfig(interface, "up") != 0) return 1;
    if (run(GOBONET_WPA_SUPPLICANT, "-Dnl80211,wext", "-c", config, "-i", interface, "-B", NULL) != 0) return 1;
    if (run(GOBONET_DHCPCD, "-C", "wpa_supplicant", interface, NULL) != 0) return 1;
    return 0;
 }
 
-static int const scan() {
-   return run(GOBONET_IWLIST, "scan", NULL);
+static int const connect_dhcp(char const *const interface, uid_t const dummy) {
+   if (disconnect(interface, false) != 0) return 1;
+   if (ifconfig(interface, "up") != 0) return 1;
+   if (run(GOBONET_DHCPCD, interface, NULL) != 0) return 1;
+   return 0;
 }
 
-static int const scan_command(int const argc, char const *const *const argv, bool const is_quick_scan) {
+static int const interface_up(char const *const interface, uid_t const dummy) {
+   if (ifconfig(interface, "up") != 0) return 1;
+   return 0;
+}
+
+static int const scan(char const *const interface, uid_t const run_as) {
+   run(GOBONET_RFKILL, "unblock", "all", NULL);
+   if (ifconfig(interface, "up") != 0) return 1;
+   setuid(run_as);
+   if (run(GOBONET_IWLIST, "scan", NULL) != 0) return 1;
+   return 0;
+}
+
+static int const interface_command(int const argc , char const *const *const argv, int const (*cmd)(char const *const, uid_t const), bool const drop_priv) {
    if (argc <= 2) {
       fprintf(stderr, "usage: %s %s <interface>\n", argv[0], argv[1]);
       return 1;
@@ -114,15 +130,9 @@ static int const scan_command(int const argc, char const *const *const argv, boo
    char const *const interface = argv[2];
    if (strlen(interface) > 64) return 1;
 
-   uid_t const uid = getuid();
+   uid_t const user = getuid();
    setuid(0);
-   run(GOBONET_RFKILL, "unblock", "all", NULL);
-   if (ifconfig(interface, "up") != 0) return 1;
-   if (is_quick_scan) {
-      setuid(uid); /* drop privileges */
-   }
-   if (scan() != 0) return 1;
-   return 0;
+   if (cmd(interface, drop_priv ? user : 0) != 0) return 1;
 }
 
 int const main(int const argc, char const *const *const argv) {
@@ -146,21 +156,16 @@ int const main(int const argc, char const *const *const argv) {
       setuid(0);
       if (connect(config, interface) != 0) return 1;
 
+   } else if (strcmp(argv[1], "interface-up") == 0) {
+      return interface_command(argc, argv, interface_up, false);
+   } else if (strcmp(argv[1], "connect-dhcp") == 0) {
+      return interface_command(argc, argv, connect_dhcp, false);
    } else if (strcmp(argv[1], "disconnect") == 0) {
-      if (argc <= 2) {
-         fprintf(stderr, "usage: %s disconnect <interface>\n", argv[0]);
-         return 1;
-      }
-      char const *const interface = argv[2];
-      if (strlen(interface) > 64) return 1;
-
-      setuid(0);
-      if (disconnect(interface) != 0) return 1;
-      
+      return interface_command(argc, argv, disconnect, false);
    } else if (strcmp(argv[1], "quick-scan") == 0) {
-      return scan_command(argc, argv, true);
+      return interface_command(argc, argv, scan, true);
    } else if (strcmp(argv[1], "full-scan") == 0) {
-      return scan_command(argc, argv, false);
+      return interface_command(argc, argv, scan, false);
    }
    return 0;
 }
