@@ -186,12 +186,18 @@ function connect_wifi() {
    fi
    
    echo $$ > "$wifi_dir/.connecting.pid"
-   gobonet_backend connect "$wifi_dir/$file" "$wifi_interface"
+   if gobonet_backend connect "$wifi_dir/$file" "$wifi_interface"
+   then
+      return 0
+   else
+      disconnect_wifi
+      return 1
+   fi
 }
 
 function connect_wired() {
    disconnect_wifi
-   gobonet_backend connect_dhcp "$wired_interface"
+   gobonet_backend connect-dhcp "$wired_interface"
 }
 
 function disconnect_wifi() {
