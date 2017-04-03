@@ -190,18 +190,19 @@ function connect_wifi() {
    then
       return 0
    else
-      disconnect_wifi
+      disconnect
       return 1
    fi
 }
 
 function connect_wired() {
-   disconnect_wifi
+   disconnect
    gobonet_backend connect-dhcp "$wired_interface"
 }
 
-function disconnect_wifi() {
-   gobonet_backend disconnect "$wifi_interface"
+function disconnect() {
+   [ "$wifi_interface"  ] && gobonet_backend disconnect "$wifi_interface"
+   [ "$wired_interface" ] && gobonet_backend disconnect "$wired_interface"
 }
 
 function forget_wifi() {
@@ -210,7 +211,7 @@ function forget_wifi() {
    
    if show_dialog --question --title="Forget $essid" --text="Are you sure you want to forget network '$essid'?"
    then
-      disconnect_wifi "$essid"
+      disconnect
       rm -f "$wifi_dir/$file"
    fi   
 }
@@ -298,7 +299,7 @@ function show_help() {
    echo "   gobonet connect_wired"
    echo "              Connect to a wired network"
    echo "   gobonet disconnect"
-   echo "              Disconnect WiFi"
+   echo "              Disconnect WiFi and wired interfaces"
    echo "   gobonet forget \"<essid>\""
    echo "              Disconnect WiFi and forget config for this network"
    echo "   gobonet list"
@@ -354,7 +355,7 @@ case "$1" in
       ;;
    disconnect)
       [ "$2" = "" ] || usage "disconnect"
-      disconnect_wifi
+      disconnect
       ;;
    forget)
       essid="$2"
