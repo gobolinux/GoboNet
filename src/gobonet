@@ -148,6 +148,7 @@ function network_config_file() {
 
 function connect_wifi() {   
    local essid="$1"
+   local no_password="$2"
    local file="$(network_config_file "$essid")"
    
    if ! [ -e "$wifi_dir/$file" ]
@@ -159,7 +160,7 @@ function connect_wifi() {
          info=$(gobonet_backend full-scan "$wifi_interface" | grep -B 1 -F "ESSID:\"$essid\"")
       fi
       info=$(echo "$info" | head -n 2)
-      if echo "$info" | grep "Encryption key:off"
+      if [ "$no_password" = "no_password" ] || echo "$info" | grep "Encryption key:off"
       then
          {
             echo "network={"
@@ -296,6 +297,9 @@ function show_help() {
    echo "              Scan WiFi networks and connect to a known one"
    echo "   gobonet connect \"<essid>\""
    echo "              Connect to a given WiFi network"
+   echo "   gobonet connect_no_password \"<essid>\""
+   echo "              Connect to a given WiFi network without a password,"
+   echo "              if network misreports the need"
    echo "   gobonet connect_wired"
    echo "              Connect to a wired network"
    echo "   gobonet disconnect"
@@ -348,6 +352,11 @@ case "$1" in
       essid="$2"
       [ "$essid" -a "$3" = "" ] || usage "connect \"<essid>\""
       connect_wifi "$essid" && echo "gobonet: Connected to \"$essid\"!"
+      ;;
+   connect_no_password)
+      essid="$2"
+      [ "$essid" -a "$3" = "" ] || usage "connect_no_password \"<essid>\""
+      connect_wifi "$essid" no_password && echo "gobonet: Connected to \"$essid\"!"
       ;;
    connect_wired)
       [ "$2" = "" ] || usage "connect_wired"
