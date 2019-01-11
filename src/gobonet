@@ -20,7 +20,10 @@ function detect_wifi_interface() {
 function detect_wired_interface() {
    for iface in /sys/class/net/*
    do
-       if egrep -q "DEVTYPE=(wlan|bridge)" "$iface/uevent" || [ -e "$iface/phy80211" ]
+       if egrep -q "DEVTYPE=(wlan|bridge)" "$iface/uevent" \
+          || [ -e "$iface/phy80211" ] \
+          || [[ "$iface" =~ ^docker ]] \
+          || [[ "$iface" =~ ^veth ]]
        then
           continue
        fi
