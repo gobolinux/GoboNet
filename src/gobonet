@@ -244,20 +244,17 @@ function autoconnect() {
       echo "gobonet: Will not autoconnect over a remote login." 1>&2
       exit 1
    fi
-   for iface in "$wifi_interface" "$wired_interface"
-   do
-      if is_connected "$iface"
-      then
-         echo "gobonet: Interface $iface is already connected." 1>&2
-         exit 1
-      fi
-   done
    if is_wired_interface_plugged "$wired_interface"
    then
-      if gobonet_backend connect-dhcp "$wired_interface"
+      if ! is_connected "$wired_interface"
       then
-         exit 0
+         gobonet_backend connect-dhcp "$wired_interface" && exit 0
       fi
+   fi
+   if is_connected "$wifi_interface"
+   then
+      echo "gobonet: Interface $wifi_interface is already connected." 1>&2
+      exit 1
    fi
 
    # Sort available networks by signal strength.
