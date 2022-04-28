@@ -118,7 +118,11 @@ static int const scan(char const *const interface, uid_t const run_as) {
    run(GOBONET_RFKILL, "unblock", "all", NULL);
    if (ifconfig(interface, "up") != 0) return 1;
    setuid(run_as);
-   if (run(GOBONET_IWLIST, "scan", NULL) != 0) return 1;
+   if (run_as == 0) {
+      if (run(GOBONET_IW, interface, "scan", NULL) != 0) return 1;
+   } else {
+      if (run(GOBONET_IWLIST, "scan", NULL) != 0) return 1;
+   }
    return 0;
 }
 

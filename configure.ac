@@ -31,6 +31,7 @@ GN_HELPER_BINARY(ifconfig)
 GN_HELPER_BINARY(wpa_supplicant)
 GN_HELPER_BINARY(dhcpcd)
 GN_HELPER_BINARY(killall)
+GN_HELPER_BINARY(iw)
 GN_HELPER_BINARY(iwlist)
 GN_HELPER_BINARY(rfkill)
 
